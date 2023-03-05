@@ -1,0 +1,8 @@
+[serviceweaver]
+binary = "./sw-blog"
+
+["github.com/edmarfelipe/serviceweaver-example/commentservice/Service"]
+db_uri = "postgresql://postgres:root@localhost:5432/sw_comments?sslmode=disable"
+
+["github.com/edmarfelipe/serviceweaver-example/postservice/Service"]
+db_uri = "postgresql://postgres:root@localhost:5432/sw_posts?sslmode=disable"

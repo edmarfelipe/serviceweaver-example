@@ -10,16 +10,25 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type Comments struct {
+type Comment struct {
 	weaver.AutoMarshal
-	ID       int
-	PostID   int
-	Content  string
-	CreateAt time.Time
+	ID       int       `json:"id"`
+	PostID   int       `json:"postId"`
+	Content  string    `json:"content"`
+	CreateAt time.Time `json:"createAt"`
+}
+
+func NewComment(postID int, content string) *Comment {
+	return &Comment{
+		PostID:   postID,
+		Content:  content,
+		CreateAt: time.Now().UTC(),
+	}
 }
 
 type Service interface {
-	GetByPost(context.Context, int) ([]Comments, error)
+	GetByPost(context.Context, int) ([]Comment, error)
+	CreateComment(ctx context.Context, postID int, content string) error
 }
 
 type config struct {
@@ -59,18 +68,19 @@ func (s *commentService) Init(ctx context.Context) error {
 	return nil
 }
 
-func (s *commentService) GetByPost(ctx context.Context, postID int) ([]Comments, error) {
+func (s *commentService) GetByPost(ctx context.Context, postID int) ([]Comment, error) {
 	s.Logger().Info("getting comments by post id", "postID", postID)
 
-	rows, err := s.db.QueryContext(ctx, "select id, post_id, content, create_at from comments where post_id = $1", postID)
+	query := "select id, post_id, content, create_at from comments where post_id = $1 limit 5"
+	rows, err := s.db.QueryContext(ctx, query, postID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var comments []Comments
+	var comments []Comment
 	for rows.Next() {
-		var com Comments
+		var com Comment
 		err := rows.Scan(&com.ID, &com.PostID, &com.Content, &com.CreateAt)
 		if err != nil {
 			return nil, err
@@ -79,4 +89,15 @@ func (s *commentService) GetByPost(ctx context.Context, postID int) ([]Comments,
 	}
 
 	return comments, nil
+}
+
+func (s *commentService) CreateComment(ctx context.Context, postID int, content string) error {
+	s.Logger().Info("creating comment", "postID", postID, "content", content)
+	comment := NewComment(postID, content)
+	query := "insert into comments ( post_id, content, create_at  ) values ($1, $2, $3)"
+	_, err := s.db.ExecContext(ctx, query, comment.PostID, comment.Content, comment.CreateAt)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -21,7 +21,7 @@ func init() {
 			return service_local_stub{impl: impl.(Service), tracer: tracer}
 		},
 		ClientStubFn: func(stub codegen.Stub, caller string) any {
-			return service_client_stub{stub: stub, getPostMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/edmarfelipe/serviceweaver-example/postservice/Service", Method: "GetPost"})}
+			return service_client_stub{stub: stub, createPostMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/edmarfelipe/serviceweaver-example/postservice/Service", Method: "CreatePost"}), getPostMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/edmarfelipe/serviceweaver-example/postservice/Service", Method: "GetPost"}), getLatestPostsMetrics: codegen.MethodMetricsFor(codegen.MethodLabels{Caller: caller, Component: "github.com/edmarfelipe/serviceweaver-example/postservice/Service", Method: "GetLatestPosts"})}
 		},
 		ServerStubFn: func(impl any, addLoad func(uint64, float64)) codegen.Server {
 			return service_server_stub{impl: impl.(Service), addLoad: addLoad}
@@ -34,6 +34,23 @@ func init() {
 type service_local_stub struct {
 	impl   Service
 	tracer trace.Tracer
+}
+
+func (s service_local_stub) CreatePost(ctx context.Context, a0 string, a1 string) (err error) {
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		// Create a child span for this method.
+		ctx, span = s.tracer.Start(ctx, "postservice.Service.CreatePost", trace.WithSpanKind(trace.SpanKindInternal))
+		defer func() {
+			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			}
+			span.End()
+		}()
+	}
+
+	return s.impl.CreatePost(ctx, a0, a1)
 }
 
 func (s service_local_stub) GetPost(ctx context.Context, a0 string) (r0 *Post, err error) {
@@ -53,11 +70,85 @@ func (s service_local_stub) GetPost(ctx context.Context, a0 string) (r0 *Post, e
 	return s.impl.GetPost(ctx, a0)
 }
 
+func (s service_local_stub) GetLatestPosts(ctx context.Context, a0 int) (r0 []Post, err error) {
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		// Create a child span for this method.
+		ctx, span = s.tracer.Start(ctx, "postservice.Service.GetLatestPosts", trace.WithSpanKind(trace.SpanKindInternal))
+		defer func() {
+			if err != nil {
+				span.RecordError(err)
+				span.SetStatus(codes.Error, err.Error())
+			}
+			span.End()
+		}()
+	}
+
+	return s.impl.GetLatestPosts(ctx, a0)
+}
+
 // Client stub implementations.
 
 type service_client_stub struct {
-	stub           codegen.Stub
-	getPostMetrics *codegen.MethodMetrics
+	stub                  codegen.Stub
+	createPostMetrics     *codegen.MethodMetrics
+	getPostMetrics        *codegen.MethodMetrics
+	getLatestPostsMetrics *codegen.MethodMetrics
+}
+
+func (s service_client_stub) CreatePost(ctx context.Context, a0 string, a1 string) (err error) {
+	// Update metrics.
+	start := time.Now()
+	s.createPostMetrics.Count.Add(1)
+
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		// Create a child span for this method.
+		ctx, span = s.stub.Tracer().Start(ctx, "postservice.Service.CreatePost", trace.WithSpanKind(trace.SpanKindClient))
+	}
+
+	defer func() {
+		// Catch and return any panics detected during encoding/decoding/rpc.
+		if err == nil {
+			err = codegen.CatchPanics(recover())
+		}
+		err = s.stub.WrapError(err)
+
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			s.createPostMetrics.ErrorCount.Add(1)
+		}
+		span.End()
+
+		s.createPostMetrics.Latency.Put(float64(time.Since(start).Microseconds()))
+	}()
+
+	// Preallocate a buffer of the right size.
+	size := 0
+	size += (4 + len(a0))
+	size += (4 + len(a1))
+	enc := codegen.NewEncoder()
+	enc.Reset(size)
+
+	// Encode arguments.
+	enc.String(a0)
+	enc.String(a1)
+	var shardKey uint64
+
+	// Call the remote method.
+	s.createPostMetrics.BytesRequest.Put(float64(len(enc.Data())))
+	var results []byte
+	results, err = s.stub.Run(ctx, 0, enc.Data(), shardKey)
+	if err != nil {
+		return
+	}
+	s.createPostMetrics.BytesReply.Put(float64(len(results)))
+
+	// Decode the results.
+	dec := codegen.NewDecoder(results)
+	err = dec.Error()
+	return
 }
 
 func (s service_client_stub) GetPost(ctx context.Context, a0 string) (r0 *Post, err error) {
@@ -101,7 +192,7 @@ func (s service_client_stub) GetPost(ctx context.Context, a0 string) (r0 *Post, 
 	// Call the remote method.
 	s.getPostMetrics.BytesRequest.Put(float64(len(enc.Data())))
 	var results []byte
-	results, err = s.stub.Run(ctx, 0, enc.Data(), shardKey)
+	results, err = s.stub.Run(ctx, 2, enc.Data(), shardKey)
 	if err != nil {
 		return
 	}
@@ -110,6 +201,60 @@ func (s service_client_stub) GetPost(ctx context.Context, a0 string) (r0 *Post, 
 	// Decode the results.
 	dec := codegen.NewDecoder(results)
 	r0 = serviceweaver_dec_ptr_Post_65f10c19(dec)
+	err = dec.Error()
+	return
+}
+
+func (s service_client_stub) GetLatestPosts(ctx context.Context, a0 int) (r0 []Post, err error) {
+	// Update metrics.
+	start := time.Now()
+	s.getLatestPostsMetrics.Count.Add(1)
+
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		// Create a child span for this method.
+		ctx, span = s.stub.Tracer().Start(ctx, "postservice.Service.GetLatestPosts", trace.WithSpanKind(trace.SpanKindClient))
+	}
+
+	defer func() {
+		// Catch and return any panics detected during encoding/decoding/rpc.
+		if err == nil {
+			err = codegen.CatchPanics(recover())
+		}
+		err = s.stub.WrapError(err)
+
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			s.getLatestPostsMetrics.ErrorCount.Add(1)
+		}
+		span.End()
+
+		s.getLatestPostsMetrics.Latency.Put(float64(time.Since(start).Microseconds()))
+	}()
+
+	// Preallocate a buffer of the right size.
+	size := 0
+	size += 8
+	enc := codegen.NewEncoder()
+	enc.Reset(size)
+
+	// Encode arguments.
+	enc.Int(a0)
+	var shardKey uint64
+
+	// Call the remote method.
+	s.getLatestPostsMetrics.BytesRequest.Put(float64(len(enc.Data())))
+	var results []byte
+	results, err = s.stub.Run(ctx, 1, enc.Data(), shardKey)
+	if err != nil {
+		return
+	}
+	s.getLatestPostsMetrics.BytesReply.Put(float64(len(results)))
+
+	// Decode the results.
+	dec := codegen.NewDecoder(results)
+	r0 = serviceweaver_dec_slice_Post_fc8e282e(dec)
 	err = dec.Error()
 	return
 }
@@ -124,11 +269,41 @@ type service_server_stub struct {
 // GetStubFn implements the stub.Server interface.
 func (s service_server_stub) GetStubFn(method string) func(ctx context.Context, args []byte) ([]byte, error) {
 	switch method {
+	case "CreatePost":
+		return s.createPost
 	case "GetPost":
 		return s.getPost
+	case "GetLatestPosts":
+		return s.getLatestPosts
 	default:
 		return nil
 	}
+}
+
+func (s service_server_stub) createPost(ctx context.Context, args []byte) (res []byte, err error) {
+	// Catch and return any panics detected during encoding/decoding/rpc.
+	defer func() {
+		if err == nil {
+			err = codegen.CatchPanics(recover())
+		}
+	}()
+
+	// Decode arguments.
+	dec := codegen.NewDecoder(args)
+	var a0 string
+	a0 = dec.String()
+	var a1 string
+	a1 = dec.String()
+
+	// TODO(rgrandl): The deferred function above will recover from panics in the
+	// user code: fix this.
+	// Call the local method.
+	appErr := s.impl.CreatePost(ctx, a0, a1)
+
+	// Encode the results.
+	enc := codegen.NewEncoder()
+	enc.Error(appErr)
+	return enc.Data(), nil
 }
 
 func (s service_server_stub) getPost(ctx context.Context, args []byte) (res []byte, err error) {
@@ -152,6 +327,31 @@ func (s service_server_stub) getPost(ctx context.Context, args []byte) (res []by
 	// Encode the results.
 	enc := codegen.NewEncoder()
 	serviceweaver_enc_ptr_Post_65f10c19(enc, r0)
+	enc.Error(appErr)
+	return enc.Data(), nil
+}
+
+func (s service_server_stub) getLatestPosts(ctx context.Context, args []byte) (res []byte, err error) {
+	// Catch and return any panics detected during encoding/decoding/rpc.
+	defer func() {
+		if err == nil {
+			err = codegen.CatchPanics(recover())
+		}
+	}()
+
+	// Decode arguments.
+	dec := codegen.NewDecoder(args)
+	var a0 int
+	a0 = dec.Int()
+
+	// TODO(rgrandl): The deferred function above will recover from panics in the
+	// user code: fix this.
+	// Call the local method.
+	r0, appErr := s.impl.GetLatestPosts(ctx, a0)
+
+	// Encode the results.
+	enc := codegen.NewEncoder()
+	serviceweaver_enc_slice_Post_fc8e282e(enc, r0)
 	enc.Error(appErr)
 	return enc.Data(), nil
 }
@@ -183,6 +383,29 @@ func (x *Post) WeaverUnmarshal(dec *codegen.Decoder) {
 }
 
 // Encoding/decoding implementations.
+
+func serviceweaver_enc_slice_Post_fc8e282e(enc *codegen.Encoder, arg []Post) {
+	if arg == nil {
+		enc.Len(-1)
+		return
+	}
+	enc.Len(len(arg))
+	for i := 0; i < len(arg); i++ {
+		(arg[i]).WeaverMarshal(enc)
+	}
+}
+
+func serviceweaver_dec_slice_Post_fc8e282e(dec *codegen.Decoder) []Post {
+	n := dec.Len()
+	if n == -1 {
+		return nil
+	}
+	res := make([]Post, n)
+	for i := 0; i < n; i++ {
+		(&res[i]).WeaverUnmarshal(dec)
+	}
+	return res
+}
 
 func serviceweaver_enc_ptr_Post_65f10c19(enc *codegen.Encoder, arg *Post) {
 	if arg == nil {
